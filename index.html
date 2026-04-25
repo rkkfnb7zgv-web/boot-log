@@ -321,26 +321,76 @@ function scheduleReminder() {
   if (!days||days<1) { setMsg('Please enter a valid number of days.','err'); return; }
   localStorage.setItem(REMIND_KEY, days);
   renderStatus();
-  if (!('Notification' in window)) { setMsg('Notifications not supported in this browser.','err'); return; }
-  Notification.requestPermission().then(function(perm) {
-    if (perm==='granted') { setMsg('Reminder set for '+days+' days.','ok'); showToast('Reminder saved'); checkAndNotify(); }
-    else { setMsg('Notifications blocked. Enable in Settings > Safari.','err'); }
+
+  // Check basic support
+  if (!('Notification' in window)) {
+    setMsg('Notifications are not supported. Make sure you opened the app from your Home Screen icon, not from Safari directly.','err');
+    return;
+  }
+
+  // iOS requires the permission request to be triggered directly by a user gesture
+  // Using a direct call rather than .then() chain for maximum iOS compatibility
+  var perm = Notification.permission;
+  if (perm === 'denied') {
+    setMsg('Notifications are blocked. Go to Settings → Notifications → find this app → turn on Allow Notifications.','err');
+    return;
+  }
+  if (perm === 'granted') {
+    setMsg('Reminder set for '+days+' days. Open the app every so often and it will alert you when due.','ok');
+    showToast('Reminder saved');
+    return;
+  }
+  // perm === 'default' — need to ask
+  Notification.requestPermission(function(result) {
+    if (result === 'granted') {
+      setMsg('Reminder set for '+days+' days. Open the app every so often and it will alert you when due.','ok');
+      showToast('Reminder saved');
+    } else {
+      setMsg('Permission not granted. Go to Settings → Notifications → find this app → Allow Notifications.','err');
+    }
   });
 }
+
 function testNotification() {
-  if (!('Notification' in window)) { setMsg('Notifications not supported.','err'); return; }
-  Notification.requestPermission().then(function(perm) {
-    if (perm!=='granted') { setMsg('Please allow notifications first.','err'); return; }
-    new Notification('Boot Polish Log', { body: 'Test notification — reminders will look like this! 👢' });
-    setMsg('Test notification sent!','ok');
-  });
+  if (!('Notification' in window)) {
+    setMsg('Notifications not supported. Open the app from your Home Screen icon, not Safari.','err');
+    return;
+  }
+  if (Notification.permission === 'denied') {
+    setMsg('Notifications are blocked. Go to Settings → Notifications → find this app → Allow Notifications.','err');
+    return;
+  }
+  if (Notification.permission !== 'granted') {
+    setMsg('Please tap Set Reminder first to grant notification permission.','err');
+    return;
+  }
+  try {
+    var n = new Notification('Boot Polish Log 👢', {
+      body: 'Notifications are working! You will be reminded when your boots need a polish.',
+      icon: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f462.svg'
+    });
+    n.onerror = function(e) { setMsg('Notification error: ' + JSON.stringify(e),'err'); };
+    setMsg('Test notification sent! You should see it now.','ok');
+  } catch(e) {
+    setMsg('Error sending notification: ' + e.message,'err');
+  }
 }
+
 function checkAndNotify() {
-  if (!entries.length||!('Notification' in window)||Notification.permission!=='granted') return;
+  if (!entries.length) return;
+  if (!('Notification' in window)) return;
+  if (Notification.permission !== 'granted') return;
   var remind = parseInt(localStorage.getItem(REMIND_KEY),10)||90;
   var latest = entries.reduce(function(a,b){return a.date>b.date?a:b;});
   var days = daysBetween(latest.date, todayStr());
-  if (days>=remind) new Notification('Boot Polish Due!',{body:'Last polished '+days+' days ago — time for a shine! 👢'});
+  if (days >= remind) {
+    try {
+      new Notification('Boot Polish Due! 👢', {
+        body: 'Your boots were last polished '+days+' days ago. Time for a shine!',
+        icon: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f462.svg'
+      });
+    } catch(e) { console.log('Notification error:', e); }
+  }
 }
 function setMsg(t,cls) { var el=document.getElementById('notifMsg'); el.textContent=t; el.className='notif-msg '+(cls||''); }
 
