@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Boot Log">
+<title>Boot Polish Log</title>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #13110c;
+    --parchment: #f2e8cc;
+    --aged: #ddd0a8;
+    --brass: #b8860b;
+    --brass-lt: #d4a820;
+    --rust: #8b2e00;
+    --green: #2a5c2a;
+    --red: #b22222;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bot: env(safe-area-inset-bottom, 0px);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background-color: var(--ink);
+    background-image:
+      radial-gradient(ellipse at 20% 10%, rgba(184,134,11,0.08) 0%, transparent 55%),
+      repeating-linear-gradient(0deg, transparent, transparent 29px, rgba(184,134,11,0.05) 29px, rgba(184,134,11,0.05) 30px);
+    font-family: 'Courier Prime', monospace;
+    color: var(--ink);
+    padding: calc(var(--safe-top) + 20px) 16px calc(var(--safe-bot) + 60px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  header { width: 100%; max-width: 480px; text-align: center; margin-bottom: 24px; }
+  .eyebrow { font-size: 10px; letter-spacing: 6px; text-transform: uppercase; color: var(--brass); opacity: 0.75; margin-bottom: 8px; }
+  h1 { font-family: 'Special Elite', cursive; font-size: clamp(30px,9vw,46px); color: var(--parchment); line-height: 1.05; text-shadow: 0 3px 12px rgba(0,0,0,0.6); }
+  .subhead { font-size: 11px; letter-spacing: 5px; text-transform: uppercase; color: var(--brass); margin-top: 8px; opacity: 0.7; }
+  .rule { width: 100%; max-width: 480px; display: flex; align-items: center; gap: 10px; margin: 4px 0 18px; }
+  .rule::before, .rule::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--brass), transparent); }
+  .rule-gem { color: var(--brass); font-size: 10px; }
+
+  #statusBanner { width: 100%; max-width: 480px; display: none; background: var(--parchment); border: 1px solid var(--aged); padding: 14px 16px; margin-bottom: 16px; position: relative; box-shadow: 3px 3px 0 rgba(0,0,0,0.3); }
+  #statusBanner.show { display: flex; align-items: center; gap: 14px; }
+  .status-days { font-family: 'Special Elite', cursive; font-size: 42px; line-height: 1; flex-shrink: 0; }
+  .status-days.ok { color: var(--green); }
+  .status-days.due { color: var(--red); }
+  .status-right { flex: 1; }
+  .status-label { font-size: 10px; letter-spacing: 3px; text-transform: uppercase; opacity: 0.55; margin-bottom: 2px; }
+  .status-msg { font-size: 13px; line-height: 1.5; }
+  .status-stamp { position: absolute; top: 10px; right: 12px; font-family: 'Special Elite', cursive; font-size: 10px; letter-spacing: 3px; padding: 3px 8px; border: 2px solid; text-transform: uppercase; transform: rotate(-6deg); }
+  .status-stamp.ok { border-color: var(--green); color: var(--green); }
+  .status-stamp.due { border-color: var(--red); color: var(--red); }
+
+  .card { width: 100%; max-width: 480px; background: var(--parchment); border: 1px solid var(--aged); padding: 20px; margin-bottom: 16px; position: relative; box-shadow: 3px 3px 0 rgba(0,0,0,0.35); }
+  .card::after { content: ''; position: absolute; inset: 5px; border: 1px solid rgba(184,134,11,0.15); pointer-events: none; }
+  .card-title { font-family: 'Special Elite', cursive; font-size: 12px; letter-spacing: 4px; text-transform: uppercase; color: var(--rust); padding-bottom: 10px; margin-bottom: 16px; border-bottom: 1px dashed rgba(139,46,0,0.25); }
+
+  .photo-zone { position: relative; height: 180px; border: 2px dashed rgba(184,134,11,0.5); overflow: hidden; background: rgba(184,134,11,0.04); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .photo-zone img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .pz-icon { font-size: 36px; opacity: 0.4; margin-bottom: 6px; pointer-events: none; }
+  .pz-hint { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; opacity: 0.45; pointer-events: none; }
+  #fileInput { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; }
+
+  .field-label { display: block; font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: var(--rust); margin: 14px 0 5px; }
+  input[type="date"], textarea, input[type="number"] {
+    width: 100%; background: rgba(221,208,168,0.35); border: 1px solid rgba(184,134,11,0.35);
+    padding: 9px 11px; font-family: 'Courier Prime', monospace; font-size: 15px; color: var(--ink);
+    border-radius: 0; outline: none; -webkit-appearance: none; appearance: none;
+  }
+  input[type="date"]:focus, textarea:focus { border-color: var(--brass); background: rgba(221,208,168,0.6); }
+  textarea { resize: vertical; min-height: 68px; }
+  input[type="number"] { width: 80px; }
+
+  .btn-primary { display: block; width: 100%; margin-top: 18px; padding: 14px; background: var(--ink); color: var(--brass-lt); border: 2px solid var(--brass); font-family: 'Special Elite', cursive; font-size: 13px; letter-spacing: 5px; text-transform: uppercase; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .btn-secondary { display: block; width: 100%; margin-top: 10px; padding: 11px; background: transparent; color: var(--rust); border: 1px solid rgba(139,46,0,0.4); font-family: 'Special Elite', cursive; font-size: 12px; letter-spacing: 4px; text-transform: uppercase; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+
+  .reminder-row { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+  .reminder-row span { font-size: 12px; letter-spacing: 1px; text-transform: uppercase; opacity: 0.65; }
+  .notif-msg { margin-top: 10px; font-size: 12px; color: rgba(19,17,12,0.5); line-height: 1.5; min-height: 16px; }
+  .notif-msg.ok { color: var(--green); }
+  .notif-msg.err { color: var(--red); }
+
+  .log-empty { text-align: center; padding: 18px 0; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.35; }
+  .entry { display: flex; gap: 12px; padding: 13px 0; border-bottom: 1px dashed rgba(184,134,11,0.28); align-items: flex-start; }
+  .entry:last-child { border-bottom: none; padding-bottom: 0; }
+  .entry:first-child { padding-top: 0; }
+  .entry-thumb { width: 62px; height: 62px; flex-shrink: 0; object-fit: cover; border: 2px solid var(--brass); }
+  .entry-no-photo { width: 62px; height: 62px; flex-shrink: 0; border: 2px dashed rgba(184,134,11,0.3); background: rgba(184,134,11,0.06); display: flex; align-items: center; justify-content: center; font-size: 22px; opacity: 0.45; }
+  .entry-body { flex: 1; min-width: 0; }
+  .entry-date { font-family: 'Special Elite', cursive; font-size: 18px; }
+  .entry-ago { font-size: 11px; letter-spacing: 1px; opacity: 0.45; margin-top: 1px; }
+  .entry-badge { display: inline-block; font-size: 9px; letter-spacing: 2px; text-transform: uppercase; padding: 2px 6px; margin-top: 4px; border: 1px solid var(--green); color: var(--green); font-family: 'Special Elite', cursive; }
+  .entry-notes { margin-top: 5px; font-size: 13px; font-style: italic; opacity: 0.65; white-space: pre-wrap; word-break: break-word; }
+  .entry-del { background: none; border: none; color: rgba(139,46,0,0.3); font-size: 26px; cursor: pointer; padding: 6px 10px; flex-shrink: 0; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: rgba(178,34,34,0.2); }
+
+  #confirmModal { display: none; position: fixed; inset: 0; z-index: 9999; align-items: center; justify-content: center; padding: 24px; background: rgba(19,17,12,0.7); }
+  #confirmModal.show { display: flex; }
+  .modal-box { background: var(--parchment); border: 1px solid var(--aged); padding: 28px 24px 22px; max-width: 300px; width: 100%; box-shadow: 4px 4px 0 rgba(0,0,0,0.4); text-align: center; }
+  .modal-title { font-family: 'Special Elite', cursive; font-size: 15px; letter-spacing: 3px; text-transform: uppercase; color: var(--rust); margin-bottom: 10px; }
+  .modal-msg { font-size: 13px; opacity: 0.7; margin-bottom: 22px; line-height: 1.5; }
+  .modal-btns { display: flex; gap: 10px; }
+  .modal-cancel { flex: 1; padding: 12px; background: transparent; border: 1px solid rgba(139,46,0,0.35); color: var(--rust); font-family: 'Special Elite', cursive; font-size: 12px; letter-spacing: 3px; text-transform: uppercase; cursor: pointer; }
+  .modal-confirm { flex: 1; padding: 12px; background: var(--ink); border: 2px solid var(--brass); color: var(--brass-lt); font-family: 'Special Elite', cursive; font-size: 12px; letter-spacing: 3px; text-transform: uppercase; cursor: pointer; }
+
+  #toast { position: fixed; bottom: calc(var(--safe-bot) + 24px); left: 50%; transform: translateX(-50%) translateY(80px); background: var(--ink); color: var(--brass-lt); font-family: 'Special Elite', cursive; font-size: 12px; letter-spacing: 4px; text-transform: uppercase; padding: 12px 24px; border: 1px solid var(--brass); box-shadow: 3px 3px 0 rgba(0,0,0,0.4); transition: transform 0.35s cubic-bezier(.22,.68,0,1.2); pointer-events: none; z-index: 9998; white-space: nowrap; }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <p class="eyebrow">Personal Equipment Record</p>
+  <h1>Boot Polish<br>Log</h1>
+  <p class="subhead">Maintenance &amp; Inspection</p>
+</header>
+<div class="rule"><span class="rule-gem">✦</span></div>
+
+<div id="statusBanner">
+  <div class="status-days" id="statusDays"></div>
+  <div class="status-right">
+    <div class="status-label">Days since last polish</div>
+    <div class="status-msg" id="statusMsg"></div>
+  </div>
+  <div class="status-stamp" id="statusStamp"></div>
+</div>
+
+<div class="card">
+  <div class="card-title">◈ Log a Polish Session</div>
+  <div class="photo-zone" id="photoZone">
+    <div class="pz-icon">📷</div>
+    <div class="pz-hint">Tap to choose photo</div>
+    <input type="file" id="fileInput" accept="image/*">
+  </div>
+  <label class="field-label" for="dateInput">Date Polished</label>
+  <input type="date" id="dateInput">
+  <label class="field-label" for="notesInput">Notes (optional)</label>
+  <textarea id="notesInput" placeholder="Products used, condition of leather, tips…"></textarea>
+  <button class="btn-primary" id="recordBtn">▸ Record Session</button>
+</div>
+
+<div class="card">
+  <div class="card-title">◈ Polish History</div>
+  <div id="logContainer"><div class="log-empty">No sessions recorded yet.</div></div>
+</div>
+
+<div class="card">
+  <div class="card-title">◈ Reminder</div>
+  <p style="font-size:13px;line-height:1.65;opacity:0.7;margin-bottom:14px;">Receive a notification when your boots are overdue for a polish. Works best when opened from your Home Screen icon.</p>
+  <label class="field-label">Remind me after</label>
+  <div class="reminder-row">
+    <input type="number" id="reminderDays" value="90" min="1" max="999">
+    <span>days without polishing</span>
+  </div>
+  <button class="btn-secondary" id="setReminderBtn">▸ Set Reminder</button>
+  <button class="btn-secondary" id="testNotifBtn">▸ Send Test Notification</button>
+  <div class="notif-msg" id="notifMsg"></div>
+</div>
+
+<div id="confirmModal">
+  <div class="modal-box">
+    <div class="modal-title">Delete Entry</div>
+    <div class="modal-msg">Remove this polish session from the log?</div>
+    <div class="modal-btns">
+      <button class="modal-cancel" id="modalCancel">Cancel</button>
+      <button class="modal-confirm" id="modalConfirm">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+var STORE_KEY  = 'bootPolishLog_v2';
+var REMIND_KEY = 'bootPolishRemind_v2';
+
+function loadEntries() {
+  try { var r = localStorage.getItem(STORE_KEY); return r ? JSON.parse(r) : []; }
+  catch(e) { return []; }
+}
+function saveEntries(arr) {
+  var slim = arr.map(function(e) { return { id:e.id, date:e.date, notes:e.notes, photo:null }; });
+  localStorage.setItem(STORE_KEY, JSON.stringify(slim));
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(arr)); }
+  catch(e) { showToast('Saved without photo — storage full'); }
+}
+
+var entries = loadEntries();
+var pendingPhoto = null;
+var pendingDeleteId = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('dateInput').value = todayStr();
+  var saved = localStorage.getItem(REMIND_KEY);
+  if (saved) document.getElementById('reminderDays').value = saved;
+  renderLog();
+  renderStatus();
+  checkAndNotify();
+
+  document.getElementById('fileInput').addEventListener('change', function() {
+    var file = this.files[0];
+    if (!file) return;
+    resizePhoto(file);
+  });
+
+  document.getElementById('recordBtn').addEventListener('click', saveEntry);
+  document.getElementById('setReminderBtn').addEventListener('click', scheduleReminder);
+  document.getElementById('testNotifBtn').addEventListener('click', testNotification);
+  document.getElementById('modalCancel').addEventListener('click', closeModal);
+  document.getElementById('modalConfirm').addEventListener('click', confirmDelete);
+
+  document.getElementById('logContainer').addEventListener('click', function(ev) {
+    var el = ev.target;
+    for (var i = 0; i < 4; i++) {
+      if (!el || el === this) break;
+      if (el.classList && el.classList.contains('entry-del')) {
+        pendingDeleteId = parseInt(el.getAttribute('data-id'), 10);
+        document.getElementById('confirmModal').classList.add('show');
+        return;
+      }
+      el = el.parentElement;
+    }
+  });
+});
+
+function resizePhoto(file) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = new Image();
+    img.onload = function() {
+      var MAX = 600, w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h*MAX/w); w = MAX; }
+        else { w = Math.round(w*MAX/h); h = MAX; }
+      }
+      var c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      pendingPhoto = c.toDataURL('image/jpeg', 0.7);
+      var zone = document.getElementById('photoZone');
+      var old = zone.querySelector('img.preview');
+      if (old) zone.removeChild(old);
+      var pi = document.createElement('img');
+      pi.className = 'preview';
+      pi.src = pendingPhoto;
+      pi.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;';
+      zone.appendChild(pi);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function saveEntry() {
+  var dateVal = document.getElementById('dateInput').value;
+  if (!dateVal) { showToast('Please select a date'); return; }
+  entries.unshift({ id: Date.now(), date: dateVal, notes: document.getElementById('notesInput').value.trim(), photo: pendingPhoto });
+  saveEntries(entries);
+  document.getElementById('notesInput').value = '';
+  pendingPhoto = null;
+  var zone = document.getElementById('photoZone');
+  var pi = zone.querySelector('img.preview');
+  if (pi) zone.removeChild(pi);
+  document.getElementById('dateInput').value = todayStr();
+  document.getElementById('fileInput').value = '';
+  renderLog(); renderStatus(); showToast('Session recorded');
+}
+
+function closeModal() {
+  pendingDeleteId = null;
+  document.getElementById('confirmModal').classList.remove('show');
+}
+function confirmDelete() {
+  if (pendingDeleteId === null) return;
+  var id = pendingDeleteId;
+  entries = entries.filter(function(e) { return e.id !== id; });
+  saveEntries(entries);
+  closeModal(); renderLog(); renderStatus(); showToast('Entry removed');
+}
+
+function renderLog() {
+  var c = document.getElementById('logContainer');
+  if (!entries.length) { c.innerHTML = '<div class="log-empty">No sessions recorded yet.</div>'; return; }
+  var sorted = entries.slice().sort(function(a,b) { return b.date < a.date ? -1 : 1; });
+  var html = '';
+  for (var i = 0; i < sorted.length; i++) {
+    var e = sorted[i];
+    var d = daysBetween(e.date, todayStr());
+    var ago = d===0?'Today':d===1?'Yesterday':d+' days ago';
+    var thumb = e.photo ? '<img class="entry-thumb" src="'+e.photo+'" alt="boots">' : '<div class="entry-no-photo">👢</div>';
+    var badge = i===0 ? '<span class="entry-badge">Most Recent</span>' : '';
+    var notes = e.notes ? '<div class="entry-notes">'+esc(e.notes)+'</div>' : '';
+    html += '<div class="entry">'+thumb+'<div class="entry-body"><div class="entry-date">'+fmtDate(e.date)+'</div><div class="entry-ago">'+ago+'</div>'+badge+notes+'</div><button class="entry-del" data-id="'+e.id+'" type="button">×</button></div>';
+  }
+  c.innerHTML = html;
+}
+
+function renderStatus() {
+  if (!entries.length) { document.getElementById('statusBanner').classList.remove('show'); return; }
+  var latest = entries.reduce(function(a,b) { return a.date>b.date?a:b; });
+  var days = daysBetween(latest.date, todayStr());
+  var remind = parseInt(document.getElementById('reminderDays').value,10)||90;
+  var overdue = days >= remind;
+  document.getElementById('statusBanner').classList.add('show');
+  var dEl = document.getElementById('statusDays');
+  dEl.textContent = days; dEl.className = 'status-days '+(overdue?'due':'ok');
+  var sEl = document.getElementById('statusStamp');
+  sEl.className = 'status-stamp '+(overdue?'due':'ok');
+  sEl.textContent = overdue?'Overdue':'In Order';
+  var rem = remind - days;
+  document.getElementById('statusMsg').textContent = overdue
+    ? 'Last polished '+fmtDate(latest.date)+'. Overdue!'
+    : 'Last polished '+fmtDate(latest.date)+'. Due in ~'+rem+' day'+(rem!==1?'s':'')+'.';
+}
+
+function scheduleReminder() {
+  var days = parseInt(document.getElementById('reminderDays').value,10);
+  if (!days||days<1) { setMsg('Please enter a valid number of days.','err'); return; }
+  localStorage.setItem(REMIND_KEY, days);
+  renderStatus();
+  if (!('Notification' in window)) { setMsg('Notifications not supported in this browser.','err'); return; }
+  Notification.requestPermission().then(function(perm) {
+    if (perm==='granted') { setMsg('Reminder set for '+days+' days.','ok'); showToast('Reminder saved'); checkAndNotify(); }
+    else { setMsg('Notifications blocked. Enable in Settings > Safari.','err'); }
+  });
+}
+function testNotification() {
+  if (!('Notification' in window)) { setMsg('Notifications not supported.','err'); return; }
+  Notification.requestPermission().then(function(perm) {
+    if (perm!=='granted') { setMsg('Please allow notifications first.','err'); return; }
+    new Notification('Boot Polish Log', { body: 'Test notification — reminders will look like this! 👢' });
+    setMsg('Test notification sent!','ok');
+  });
+}
+function checkAndNotify() {
+  if (!entries.length||!('Notification' in window)||Notification.permission!=='granted') return;
+  var remind = parseInt(localStorage.getItem(REMIND_KEY),10)||90;
+  var latest = entries.reduce(function(a,b){return a.date>b.date?a:b;});
+  var days = daysBetween(latest.date, todayStr());
+  if (days>=remind) new Notification('Boot Polish Due!',{body:'Last polished '+days+' days ago — time for a shine! 👢'});
+}
+function setMsg(t,cls) { var el=document.getElementById('notifMsg'); el.textContent=t; el.className='notif-msg '+(cls||''); }
+
+var toastTimer;
+function showToast(msg) {
+  var t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(function(){t.classList.remove('show');},2600);
+}
+function todayStr() {
+  var d=new Date(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+  return d.getFullYear()+'-'+m+'-'+day;
+}
+function daysBetween(s1,s2) {
+  return Math.max(0,Math.round((new Date(s2+'T12:00:00')-new Date(s1+'T12:00:00'))/86400000));
+}
+function fmtDate(s) {
+  return new Date(s+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+}
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
